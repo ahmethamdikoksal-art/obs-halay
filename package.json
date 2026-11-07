@@ -1,0 +1,22 @@
+{
+  "name": "obs-halay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TikTok canlı yayını için yorumla oynanan Online Halay oyunu",
+  "scripts": {
+    "start": "node kopru.mjs",
+    "sahte": "node sahte-test.mjs",
+    "olcum": "node sahte-test.mjs --olcum",
+    "test": "node --test test/*.test.mjs",
+    "kontrol": "node test/sayfa-kontrol.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "tiktok-live-connector": "^2.5.0",
+    "ws": "^8.22.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
