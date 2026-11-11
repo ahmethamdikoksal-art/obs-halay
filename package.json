@@ -6,6 +6,7 @@
   "description": "TikTok canlı yayını için yorumla oynanan Online Halay oyunu",
   "scripts": {
     "start": "node kopru.mjs",
+    "youtube": "node kopru-youtube.mjs",
     "sahte": "node sahte-test.mjs",
     "olcum": "node sahte-test.mjs --olcum",
     "test": "node --test test/*.test.mjs",

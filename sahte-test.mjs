@@ -3,15 +3,18 @@
 //   node sahte-test.mjs           -> sahte olaylar + ölçüm
 //   node sahte-test.mjs --olay    -> yalnız sahte olaylar
 //   node sahte-test.mjs --olcum   -> yalnız yapay zekâ ölçümü (ws açmaz)
+//   node sahte-test.mjs --youtube -> sahte YouTube API yanıtları (sayfayı ?platform=youtube ile aç)
 import 'dotenv/config';
 import { sunucuAc, HOST } from './sunucu.mjs';
 import { HizSiniri, hediyeOlayi, begeniOlayi, yorumuCevir } from './ortak.mjs';
 import { yorumla } from './beyin.mjs';
+import { sohbetOku, BegeniSayaci } from './youtube.mjs';
 
 const PORT = Number(process.env.WS_PORT) || 8765;
 const arg = new Set(process.argv.slice(2));
-const OLAY = !arg.has('--olcum');
-const OLCUM = !arg.has('--olay');
+const YOUTUBE = arg.has('--youtube');
+const OLAY = !YOUTUBE && !arg.has('--olcum');
+const OLCUM = !YOUTUBE && !arg.has('--olay');
 const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- 10 örnek yorum: beklenen hareket ve tempo (birden çok doğru olabilir) ----------
@@ -115,8 +118,59 @@ async function sahteOlaylar() {
   return { sunucu, gonder };
 }
 
+// ---------- YouTube: sahte API yanıtları gerçek youtube.mjs kodundan geçer ----------
+async function sahteYoutube() {
+  const sunucu = sunucuAc(PORT);
+  await sunucu.hazir;
+  console.log(`ws sunucusu: ws://${HOST}:${PORT}. Sayfayı aç: ${sunucu.adres}?platform=youtube (en çok 20 sn beklenir).`);
+  const t0 = Date.now();
+  while (sunucu.wss.clients.size === 0 && Date.now() - t0 < 20000) await bekle(200);
+  console.log(sunucu.wss.clients.size ? 'sayfa bağlandı' : 'sayfa bağlanmadı, olaylar yine de yollanıyor');
+
+  const yaz = (ad, tip, ek = {}) => ({ snippet: { type: tip, ...ek }, authorDetails: { displayName: ad } });
+  const metin = (ad, m) => yaz(ad, 'textMessageEvent', { textMessageDetails: { messageText: m } });
+  const adlar = ['Ayşe', 'Mehmet', 'Zeynep', 'Ali', 'Elif', 'Mustafa', 'Fatma', 'Emre', 'Hatice', 'Burak', 'Derya', 'Cem'];
+  const sayfalar = [
+    { items: [metin('Eski', 'HALAY'), metin('Eski2', 'HALAY')] },                       // açılış: atlanmalı
+    { items: adlar.map((a) => metin(a, 'HALAY')) },
+    { items: [metin('Ali', 'HORON'), yaz('Mehmet', 'superChatEvent', { superChatDetails: { amountDisplayString: '₺50,00' } }), yaz('Elif', 'newSponsorEvent')] },
+    { items: [yaz('Zeynep', 'membershipGiftingEvent', { membershipGiftingDetails: { giftMembershipsCount: 3 } }), yaz('Cem', 'giftMembershipReceivedEvent')] },
+  ];
+  let istek = 0;
+  const getir = async () => {
+    const v = sayfalar[istek++];
+    if (!v) return { ok: false, status: 403, json: async () => ({ error: { code: 403, message: 'The live chat is no longer live.', errors: [{ reason: 'liveChatEnded' }] } }) };
+    return { ok: true, status: 200, json: async () => ({ nextPageToken: 'P' + istek, pollingIntervalMillis: 2000, ...v }) };
+  };
+  const sinir = new HizSiniri();
+  let yorumSay = 0, hediyeSay = 0;
+  const olayVer = async (o) => {
+    if (o.tur === 'yorum') {
+      const c = await yorumuCevir(o.ad, o.metin, sinir, yorumla);
+      console.log(`  yorum  ${hucre(o.ad, 8)} "${o.metin}" → ${c ? 'yollandı' : 'yollanmadı (3 sn sınırı)'}`);
+      if (c) { yorumSay++; sunucu.yolla(c); }
+    } else { hediyeSay++; console.log(`  hediye ${hucre(o.ad, 8)} ${o.adet} x ${o.metin}`); sunucu.yolla(o); }
+  };
+  // 5 sn yoklama aralığını beklememek için uyku 300 ms'ye kısaltılır; aralık değeri günlüğe yazılır
+  const sonuc = await sohbetOku({ anahtar: 'sahte', sohbetId: 'SAHTE', getir, olayVer, gunluk: (m) => console.log('  [youtube] ' + m),
+    uyu: async (ms) => { console.log(`  [youtube] ${ms} ms bekleme (testte 300 ms)`); await bekle(300); } });
+  console.log(`  sohbetOku sonucu: ${sonuc}; ${istek} istek, ${yorumSay} yorum ve ${hediyeSay} hediye yollandı`);
+
+  console.log('\n  Beğeni sayısı okumaları: 500 → 530 → 545 → 590 → gizli → 600');
+  const b = new BegeniSayaci();
+  for (const toplam of [500, 530, 545, 590, null, 600]) {
+    const o = b.guncelle(toplam);
+    console.log(`  toplam ${toplam ?? 'gizli'} → ${o ? '+' + o.adet + ' beğeni yollandı' : 'olay yok'}`);
+    if (o) sunucu.yolla(o);
+    await bekle(150);
+  }
+  await bekle(1500);
+  await sunucu.kapat();
+}
+
 let sunucu = null, gonder = null;
 try {
+  if (YOUTUBE) await sahteYoutube();
   if (OLAY) ({ sunucu, gonder } = await sahteOlaylar());
   if (OLCUM) { if (OLAY) await bekle(3100); await olcum(gonder); }
   if (sunucu) { await bekle(1500); await sunucu.kapat(); }

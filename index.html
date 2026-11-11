@@ -74,6 +74,7 @@ const TEMPO_SONME_MS = 45000;    // 45 sn beğeni gelmezse tempo bir kademe iner
 const prm = new URLSearchParams(location.search);
 const TEMIZ = prm.get('temiz') === '1';
 const SES_KAPALI = prm.get('ses') === '0';
+const YOUTUBE = prm.get('platform') === 'youtube';
 const WS_ADRES = location.protocol === 'http:' && location.hostname === '127.0.0.1'
   ? 'ws://' + location.host
   : 'ws://127.0.0.1:' + (Number(prm.get('port')) || 8765);
@@ -456,7 +457,8 @@ function kuralPaneli() {
     ['HALAY', ' yaz → sıraya gir', '#ffffff'],
     ['HORON / ZEYBEK', ' yaz → dans değişir', '#ffffff'],
     ['40 beğeni', ' → tempo bir kademe artar', '#ff9bb0'],
-    ['Hediye', ' gönder → mendil senin, halay başı sen ol!', '#ffd23f'],
+    YOUTUBE ? ['Super Chat / üyelik', ' → mendil senin, halay başı sen!', '#ffd23f']
+            : ['Hediye', ' gönder → mendil senin, halay başı sen ol!', '#ffd23f'],
   ];
   satir.forEach(([k, d, r], i) => {
     const y = 275 + i * 48;
