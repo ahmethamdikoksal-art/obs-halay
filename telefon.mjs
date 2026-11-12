@@ -34,6 +34,10 @@ stil.textContent = `
   #tDurum { position: fixed; left: 50%; top: max(6px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 9; max-width: 92vw;
     padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,.72); color: #fff; font: 13px -apple-system, system-ui, sans-serif;
     transition: opacity .6s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #tDurum.hata { background: rgba(150,20,30,.85); white-space: normal; }
+  #tDurumKutu { margin-top: 16px; padding: 10px 12px; border-radius: 10px; background: #0b0d12; border: 1px solid #333;
+    font: 13px/1.5 ui-monospace, Menlo, monospace; color: #cfd3dd; white-space: pre-wrap; word-break: break-word; }
+  #tDurumKutu .baslik { font: 600 13px -apple-system, system-ui, sans-serif; color: #9cf; margin-bottom: 4px; }
 `;
 document.head.appendChild(stil);
 
@@ -55,6 +59,8 @@ const hatirla = el('input', { type: 'checkbox', id: 'tHatirla', checked: kayitli
 const mesaj = el('div', { className: 'mesaj', id: 'tMesaj' });
 const basla = el('button', { id: 'tBasla', text: '▶ Başla' });
 const sil = el('button', { id: 'tSil', className: 'ikincil', text: 'Anahtarları bu telefondan sil' });
+const durumMetni = el('div', { id: 'tDurumMetni', text: 'Henüz başlatılmadı.' });
+const durumKutu = el('div', { id: 'tDurumKutu' }, el('div', { className: 'baslik', text: 'Son durum (sorun olursa bu kutunun ekran görüntüsünü gönder)' }), durumMetni);
 
 const kurulum = el('div', { id: 'tKurulum' }, el('div', { className: 'kutu' },
   el('h1', { text: 'Online Halay · YouTube' }),
@@ -64,17 +70,35 @@ const kurulum = el('div', { id: 'tKurulum' }, el('div', { className: 'kutu' },
   el('label', { htmlFor: 'tYayin', text: 'Canlı yayın adresi' }), yayin,
   el('label', { htmlFor: 'tAralik', text: 'Sohbet okuma aralığı (saniye, en az 5; büyük = daha az kota)' }), aralik,
   el('div', { className: 'satir' }, hatirla, el('label', { htmlFor: 'tHatirla', text: 'Bu telefonda hatırla', style: 'margin:0' })),
-  basla, mesaj, sil,
+  basla, mesaj, durumKutu, sil,
 ));
 const durumSerit = el('div', { id: 'tDurum', style: 'opacity:0' });
 document.body.append(kurulum, durumSerit);
 
+// ---------- teşhis: son durum, sayaçlar, son hata (anahtar asla yazılmaz) ----------
+const teshis = { son: '', sayfa: 0, mesaj: 0, olay: 0, hata: '', hataSaati: '' };
+const saat = () => new Date().toLocaleTimeString('tr-TR');
+function teshisYaz() {
+  durumMetni.textContent =
+    `Son: ${teshis.son || '-'}\n` +
+    `Okunan sohbet sayfası: ${teshis.sayfa} · gelen mesaj: ${teshis.mesaj} · oyuna giden olay: ${teshis.olay}\n` +
+    `Son hata: ${teshis.hata ? teshis.hataSaati + ' ' + teshis.hata : 'yok'}`;
+}
+
 let solTimer = null;
-function durum(metin) {
+// hata=true: şerit hata düzelene kadar ekranda kalır
+function durum(metin, hata = false) {
+  teshis.son = saat() + ' ' + metin;
+  if (hata) { teshis.hata = metin; teshis.hataSaati = saat(); }
+  teshisYaz();
   durumSerit.textContent = metin;
+  durumSerit.classList.toggle('hata', hata);
   durumSerit.style.opacity = '1';
   clearTimeout(solTimer);
-  solTimer = setTimeout(() => { durumSerit.style.opacity = '0'; }, 5000);
+  if (!hata) solTimer = setTimeout(() => { durumSerit.style.opacity = '0'; }, 5000);
+}
+function hataTemizle() {
+  if (durumSerit.classList.contains('hata')) { durumSerit.classList.remove('hata'); durumSerit.style.opacity = '0'; }
 }
 
 // ---------- ekran kararmasın ----------
@@ -104,10 +128,10 @@ async function calistir({ ytAnahtar, gemAnahtar, videoId, araMs }, sinyal) {
   const olayVer = async (o) => {
     if (o.tur === 'yorum') {
       const c = await yorumuCevir(o.ad, o.metin, sinir, yz);
-      if (c) window.olay({ ...c, zaman: Date.now() });
+      if (c) { window.olay({ ...c, zaman: Date.now() }); teshis.olay++; teshisYaz(); }
       return;
     }
-    window.olay(o);
+    window.olay(o); teshis.olay++; teshisYaz();
   };
   let begeniBasladi = false;
   const begeniDongusu = async () => {
@@ -115,7 +139,7 @@ async function calistir({ ytAnahtar, gemAnahtar, videoId, araMs }, sinyal) {
       await uyu(BEGENI_ARALIK_MS, sinyal);
       if (sinyal.aborted) return;
       try { const o = begeni.guncelle((await videoBilgisi(fetch, ytAnahtar, videoId)).begeni); if (o) window.olay(o); }
-      catch (e) { if (kotaHatasiMi(e)) { durum('YouTube kotası doldu; beğeniler 15 dk duraklatıldı'); await uyu(15 * 60000, sinyal); } }
+      catch (e) { if (kotaHatasiMi(e)) { durum('YouTube kotası doldu; beğeniler 15 dk duraklatıldı', true); await uyu(15 * 60000, sinyal); } }
     }
   };
 
@@ -125,25 +149,30 @@ async function calistir({ ytAnahtar, gemAnahtar, videoId, araMs }, sinyal) {
       bilgi = await videoBilgisi(fetch, ytAnahtar, videoId);
     } catch (e) {
       if (anahtarHatasiMi(e)) { ayarlariAc('YouTube anahtarı reddedildi: ' + e.neden + '. Google Cloud\'da YouTube Data API v3 açık mı, anahtar kısıtı doğru mu?'); return; }
-      durum(kotaHatasiMi(e) ? 'YouTube kotası doldu; 15 dk sonra yeniden' : 'Video bilgisi alınamadı (' + e.neden + '); 60 sn sonra yeniden');
+      durum(kotaHatasiMi(e) ? 'YouTube kotası doldu; 15 dk sonra yeniden' : `Video bilgisi alınamadı (HTTP ${e.durum ?? '?'} / ${e.neden ?? e.name}): ${e.message}; 60 sn sonra yeniden`, true);
       await uyu(kotaHatasiMi(e) ? 15 * 60000 : 60000, sinyal); continue;
     }
-    if (!bilgi.sohbetId) { durum('Yayın henüz canlı değil; 60 sn sonra yeniden bakılacak'); await uyu(60000, sinyal); continue; }
+    if (!bilgi.sohbetId) { durum(`"${bilgi.baslik}" canlı değil ya da sohbeti kapalı; 60 sn sonra yeniden bakılacak`, true); await uyu(60000, sinyal); continue; }
     begeni.guncelle(bilgi.begeni);
     if (!begeniBasladi) { begeniBasladi = true; begeniDongusu(); }
     durum(bilgi.begeni === null ? 'Sohbete bağlanılıyor (beğeni sayısı gizli: 40 beğeni kuralı çalışmaz)' : 'Sohbete bağlanılıyor');
     const sonuc = await sohbetOku({
       anahtar: ytAnahtar, sohbetId: bilgi.sohbetId, olayVer, sinyal, enAzAralik: araMs,
       uyu: (ms) => uyu(ms, sinyal),
-      gunluk: (m) => durum(m.replace(/^sohbete bağlanıldı.*/, 'Sohbet bağlı ✓')),
+      gunluk: (m) => {
+        if (/^sohbete bağlanıldı/.test(m)) { hataTemizle(); durum('Sohbet bağlı ✓ (' + m + ')'); }
+        else durum(m, /okunamadı|hatası|kotası|kapandı|çevrimdışı/.test(m));
+      },
+      sayfaOkundu: (n) => { teshis.sayfa++; teshis.mesaj += n; if (teshis.hata && teshis.sayfa) { teshis.hata = ''; hataTemizle(); } teshisYaz(); },
     });
     if (sonuc === 'anahtar') { ayarlariAc('YouTube anahtarı reddedildi. Anahtarı ve kısıtlarını kontrol et.'); return; }
-    if (sonuc === 'bitti') { durum('Sohbet kapandı; 60 sn sonra yeniden bakılacak'); await uyu(60000, sinyal); }
+    if (sonuc === 'bitti') { durum('Sohbet kapandı; 60 sn sonra yeniden bakılacak', true); await uyu(60000, sinyal); }
   }
 }
 
 function ayarlariAc(hata = '') {
   mesaj.textContent = hata;
+  if (hata) { teshis.hata = hata; teshis.hataSaati = saat(); teshisYaz(); }
   basla.textContent = calisma && !calisma.signal.aborted ? '↻ Yeniden başlat' : '▶ Başla';
   kurulum.style.display = '';
 }
@@ -164,6 +193,8 @@ basla.addEventListener('click', async () => {
   } else ayarSil();
   calisma?.abort();
   calisma = new AbortController();
+  Object.assign(teshis, { sayfa: 0, mesaj: 0, olay: 0, hata: '' });
+  durum('Başlatıldı: video ' + videoId);
   kurulum.style.display = 'none';
   if (!(await ekranAcikKalsin())) durum('Uyarı: ekran kararmasını engelleyemedim. Ayarlar > Ekran ve Parlaklık > Otomatik Kilit: Asla');
   calistir({ ytAnahtar, gemAnahtar, videoId, araMs: araSn * 1000 }, calisma.signal);

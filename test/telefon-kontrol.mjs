@@ -109,10 +109,35 @@ dogrula('anahtar hiçbir adreste yok, hep başlıkta', istekler.length > 3 && is
 await sayfa.mouse.click(200, 500); await sayfa.mouse.click(200, 500);
 await bekle(300);
 dogrula('çift dokunuş ayarları açar', await sayfa.isVisible('#tKurulum'));
+const k1 = await sayfa.textContent('#tDurumMetni');
+dogrula('başarılı akışta sayaçlar doluyor, hata yok', /gelen mesaj: 1[0-9]/.test(k1) && /oyuna giden olay: [1-9]/.test(k1) && k1.includes('Son hata: yok'), k1.replace(/\n/g, ' | '));
 await sayfa.click('#tSil');
 dogrula('"Anahtarları sil" depoyu boşaltır', (await sayfa.evaluate(() => localStorage.getItem('obsHalayTelefon'))) === null && (await sayfa.inputValue('#tYt')) === '');
 
 dogrula('konsol hatası yok', konsol.length === 0, konsol.join(' | '));
+
+// 7. teşhis: sohbet okuma 401 ile reddedilirse hata ekranda kalır ve "Son durum" kutusunda görünür
+const s2 = await (await tarayici.newContext({ ...devices['iPhone 13'] })).newPage();
+await s2.route('https://www.googleapis.com/youtube/v3/**', async (route) => {
+  const u = new URL(route.request().url());
+  if (u.pathname.endsWith('/videos'))
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ items: [{ snippet: { title: 'Deneme' }, liveStreamingDetails: { activeLiveChatId: 'S' }, statistics: { likeCount: '1' } }] }) });
+  return route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify({ error: { code: 401, message: 'Login Required.', errors: [{ reason: 'required', message: 'Login Required.' }], status: 'UNAUTHENTICATED' } }) });
+});
+await s2.goto(ADRES + '/telefon.html');
+await s2.waitForSelector('#tBasla');
+await s2.fill('#tYt', YT); await s2.fill('#tYayin', 'jfKfPfyJRdk'); await s2.click('#tBasla');
+await bekle(8000); // 5 sn'lik solma süresinden uzun bekle
+const serit = await s2.evaluate(() => { const e = document.getElementById('tDurum'); return { metin: e.textContent, hata: e.classList.contains('hata'), gorunur: getComputedStyle(e).opacity === '1' }; });
+dogrula('401 hatası şeritte kalıcı', serit.hata && serit.gorunur && serit.metin.includes('HTTP 401 / required'), serit.metin);
+await s2.mouse.click(200, 500); await s2.mouse.click(200, 500); await bekle(300);
+const kutu = await s2.textContent('#tDurumMetni');
+dogrula('"Son durum" kutusunda HTTP kodu ve neden var', kutu.includes('HTTP 401 / required') && kutu.includes('Login Required'), kutu.replace(/\n/g, ' | '));
+dogrula('durum kutusunda anahtar yok', !kutu.includes(YT));
+await s2.screenshot({ path: path.join(cikti, 'telefon-teshis.png') });
+
 await tarayici.close();
 sunucu.close();
 console.log(hata ? `\n${hata} denetim KALDI` : '\nTüm telefon denetimleri geçti');

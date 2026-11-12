@@ -102,7 +102,8 @@ const uyuVarsayilan = (ms, sinyal) => new Promise((ok) => {
 
 // liveChatMessages.list döngüsü. Dönüş: 'bitti' | 'anahtar' | 'durduruldu'
 // Açılışta eski mesajlar işlenmez (yalnız nextPageToken alınır).
-export async function sohbetOku({ anahtar, sohbetId, olayVer, getir = fetch, uyu = uyuVarsayilan, sinyal, gunluk = () => {}, kotaBekleme = 15 * 60000, enAzAralik = EN_AZ_ARALIK_MS }) {
+// sayfaOkundu(n): her başarılı okumada o sayfadaki mesaj sayısıyla çağrılır (teşhis sayaçları için)
+export async function sohbetOku({ anahtar, sohbetId, olayVer, getir = fetch, uyu = uyuVarsayilan, sinyal, gunluk = () => {}, kotaBekleme = 15 * 60000, enAzAralik = EN_AZ_ARALIK_MS, sayfaOkundu = () => {} }) {
   let sayfa = null;
   let ilk = true;
   while (!sinyal?.aborted) {
@@ -115,9 +116,11 @@ export async function sohbetOku({ anahtar, sohbetId, olayVer, getir = fetch, uyu
       if (sohbetBittiMi(h)) { gunluk(`sohbet kapandı (${h.neden})`); return 'bitti'; }
       if (anahtarHatasiMi(h)) { gunluk(`API anahtarı hatası (${h.neden}): ${h.message}`); return 'anahtar'; }
       if (kotaHatasiMi(h)) { gunluk(`YouTube kotası doldu (${h.neden}); ${Math.round(kotaBekleme / 60000)} dk bekleniyor`); await uyu(kotaBekleme, sinyal); continue; }
-      gunluk(`sohbet okunamadı: ${h.message}; 10 sn sonra yeniden`); await uyu(10000, sinyal); continue;
+      const kod = h instanceof YoutubeHatasi ? ` (HTTP ${h.durum} / ${h.neden})` : '';
+      gunluk(`sohbet okunamadı${kod}: ${h.message}; 10 sn sonra yeniden`); await uyu(10000, sinyal); continue;
     }
     sayfa = v.nextPageToken ?? sayfa;
+    sayfaOkundu((v.items ?? []).length);
     if (!ilk) for (const item of v.items ?? []) { const o = mesajOlayi(item); if (o) await olayVer(o); }
     else gunluk(`sohbete bağlanıldı; açılıştaki ${(v.items ?? []).length} eski mesaj atlandı`);
     ilk = false;
