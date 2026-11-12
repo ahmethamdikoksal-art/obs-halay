@@ -621,6 +621,8 @@ function sesBaslat() {
   if (SES_KAPALI) return;
   try {
     if (!ses.ctx) {
+      // iPhone: Zil/Sessiz düğmesi sessizdeyken de çalsın (Safari 16.4+; desteklemeyen tarayıcıda yok sayılır)
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       ses.ctx = new AC();
@@ -629,11 +631,35 @@ function sesBaslat() {
       for (let i = 0; i < uz; i++) d[i] = Math.random() * 2 - 1;
       ses.gurultu = buf;
       ses.sonraki = ses.ctx.currentTime + 0.1;
+      ses.ctx.onstatechange = sesRozetGuncelle;
       setInterval(sesZamanla, 25);
     }
-    if (ses.ctx.state === 'suspended') ses.ctx.resume().catch(() => {});
+    // 'suspended' (henüz izin yok) ve iPhone'un 'interrupted' (başka uygulamaya geçildi) durumlarının ikisinde de yeniden dene
+    if (ses.ctx.state !== 'running') ses.ctx.resume().then(sesRozetGuncelle, () => {});
   } catch (e) { /* ses yoksa oyun sürer */ }
+  sesRozetGuncelle();
 }
+
+// Kendi kendine iyileşme: iOS sesi yalnız bir dokunuşun içinde açar. Her dokunuşta ve sayfa görünür olunca dene.
+for (const tur of ['pointerdown', 'touchend', 'keydown'])
+  addEventListener(tur, () => { if (!ses.ctx || ses.ctx.state !== 'running') sesBaslat(); }, { capture: true, passive: true });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sesBaslat(); });
+
+// Telefon modunda ses kapalıysa küçük bir uyarı rozeti (OBS/bilgisayarda gösterilmez)
+const sesRozet = document.createElement('div');
+sesRozet.id = 'sesRozet';
+sesRozet.textContent = '🔇 Ses kapalı — açmak için ekrana dokun';
+sesRozet.style.cssText = 'position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;' +
+  'padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;font:600 14px -apple-system,system-ui,sans-serif;' +
+  'pointer-events:none;display:none;white-space:nowrap';
+document.body.appendChild(sesRozet);
+function sesDurumu() { return SES_KAPALI ? 'kapalı (?ses=0)' : !ses.ctx ? 'başlamadı' : ses.ctx.state === 'running' ? 'çalışıyor' : ses.ctx.state === 'interrupted' ? 'kesintide' : 'askıda'; }
+window.sesDurumu = sesDurumu;
+function sesRozetGuncelle() {
+  const goster = TELEFON && !SES_KAPALI && (!ses.ctx || ses.ctx.state !== 'running');
+  sesRozet.style.display = goster ? '' : 'none';
+}
+setInterval(sesRozetGuncelle, 1000);
 
 function gum(t, guc) {
   const o = ses.ctx.createOscillator(), g = ses.ctx.createGain();

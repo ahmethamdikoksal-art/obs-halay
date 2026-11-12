@@ -82,8 +82,10 @@ function teshisYaz() {
   durumMetni.textContent =
     `Son: ${teshis.son || '-'}\n` +
     `Okunan sohbet sayfası: ${teshis.sayfa} · gelen mesaj: ${teshis.mesaj} · oyuna giden olay: ${teshis.olay}\n` +
-    `Son hata: ${teshis.hata ? teshis.hataSaati + ' ' + teshis.hata : 'yok'}`;
+    `Son hata: ${teshis.hata ? teshis.hataSaati + ' ' + teshis.hata : 'yok'}\n` +
+    `Ses: ${window.sesDurumu?.() ?? '?'}`;
 }
+setInterval(teshisYaz, 2000);
 
 let solTimer = null;
 // hata=true: şerit hata düzelene kadar ekranda kalır
@@ -172,6 +174,7 @@ async function calistir({ ytAnahtar, gemAnahtar, videoId, araMs }, sinyal) {
 
 function ayarlariAc(hata = '') {
   mesaj.textContent = hata;
+  teshisYaz(); // açılır açılmaz güncel durumu göster (2 sn'lik yenilemeyi bekleme)
   if (hata) { teshis.hata = hata; teshis.hataSaati = saat(); teshisYaz(); }
   basla.textContent = calisma && !calisma.signal.aborted ? '↻ Yeniden başlat' : '▶ Başla';
   kurulum.style.display = '';

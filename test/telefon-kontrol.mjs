@@ -102,6 +102,18 @@ await bekle(31000);
 d = await sayfa.evaluate(() => oyunDurumu());
 dogrula('beğeni artışı tempoyu yükseltti', tempo0 === 'orta' && d.tempo === 'hizli' && d.begeniToplam === 45, `${tempo0}→${d.tempo}, beğeni=${d.begeniToplam}`);
 
+// 4b. ses: Başla dokunuşuyla açılır; iPhone'daki kesinti taklit edilince rozet çıkar, bir dokunuş sesi geri açar
+dogrula('Başla sonrası ses çalışıyor, rozet gizli', (await sayfa.evaluate(() => [oyunDurumu().ses, getComputedStyle(document.getElementById('sesRozet')).display])).join() === 'true,none');
+await sayfa.evaluate(() => ses.ctx.suspend());
+await bekle(1300);
+const rozet = await sayfa.evaluate(() => [sesDurumu(), getComputedStyle(document.getElementById('sesRozet')).display, document.getElementById('sesRozet').textContent]);
+dogrula('ses kesilince rozet görünür', rozet[0] !== 'çalışıyor' && rozet[1] !== 'none', rozet.join(' | '));
+await sayfa.screenshot({ path: path.join(cikti, 'telefon-ses-rozet.png') });
+await sayfa.mouse.click(60, 300);
+await bekle(600);
+const geri = await sayfa.evaluate(() => [sesDurumu(), getComputedStyle(document.getElementById('sesRozet')).display]);
+dogrula('tek dokunuş sesi geri açar, rozet kaybolur', geri.join() === 'çalışıyor,none', geri.join());
+
 // 5. anahtar hiçbir isteğin adresinde yok
 dogrula('anahtar hiçbir adreste yok, hep başlıkta', istekler.length > 3 && istekler.every((i) => !i.url.includes(YT) && !i.url.includes(GEM) && (i.anahtar === YT || i.anahtar === GEM)), istekler.length + ' istek');
 
@@ -110,7 +122,7 @@ await sayfa.mouse.click(200, 500); await sayfa.mouse.click(200, 500);
 await bekle(300);
 dogrula('çift dokunuş ayarları açar', await sayfa.isVisible('#tKurulum'));
 const k1 = await sayfa.textContent('#tDurumMetni');
-dogrula('başarılı akışta sayaçlar doluyor, hata yok', /gelen mesaj: 1[0-9]/.test(k1) && /oyuna giden olay: [1-9]/.test(k1) && k1.includes('Son hata: yok'), k1.replace(/\n/g, ' | '));
+dogrula('başarılı akışta sayaçlar doluyor, hata yok', /gelen mesaj: 1[0-9]/.test(k1) && /oyuna giden olay: [1-9]/.test(k1) && k1.includes('Son hata: yok') && k1.includes('Ses: çalışıyor'), k1.replace(/\n/g, ' | '));
 await sayfa.click('#tSil');
 dogrula('"Anahtarları sil" depoyu boşaltır', (await sayfa.evaluate(() => localStorage.getItem('obsHalayTelefon'))) === null && (await sayfa.inputValue('#tYt')) === '');
 
