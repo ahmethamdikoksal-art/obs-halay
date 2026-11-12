@@ -54,6 +54,48 @@ dogrula('yapay: geçersiz hareket/tempo atıldı, söz gösterildi', y[0] && y[1
 const g = await sayfa.evaluate(() => olay({ tur: 'sil', ad: 'x' }).kabul);
 dogrula('bilinmeyen tur reddedilir', g === false);
 
+// 8. ses: her dans doğru çalgıyla çalar, dans değişince ses kesilmez, notada hata olsa da döngü durmaz
+await sayfa.click('button[data-k="ses"]');
+await sayfa.evaluate(() => {
+  window.say = { zurna: 0, kemence: 0, davul: 0 };
+  const z = zurna, k = kemence, g = gum, t = tak;
+  zurna = (...a) => { say.zurna++; z(...a); }; kemence = (...a) => { say.kemence++; k(...a); };
+  gum = (...a) => { say.davul++; g(...a); }; tak = (...a) => { say.davul++; t(...a); };
+});
+const dinle = async (dans) => {
+  await sayfa.evaluate((d) => { durum.dans = d; say.zurna = say.kemence = say.davul = 0; }, dans);
+  await sayfa.waitForTimeout(2500);
+  return sayfa.evaluate(() => ({ ...say, ses: sesDurumu() }));
+};
+const sonuclar = {};
+for (const d of ['halay', 'horon', 'zeybek', 'horon']) sonuclar[d + Object.keys(sonuclar).length] = await dinle(d);
+const [h0, r1, z2, r3] = Object.values(sonuclar);
+dogrula('halay: zurna + davul, kemençe yok', h0.zurna > 0 && h0.davul > 0 && h0.kemence === 0, JSON.stringify(h0));
+dogrula('horon: kemençe + davul, zurna yok', r1.kemence > 0 && r1.davul > 0 && r1.zurna === 0, JSON.stringify(r1));
+dogrula('zeybek: zurna + davul, kemençe yok', z2.zurna > 0 && z2.davul > 0 && z2.kemence === 0, JSON.stringify(z2));
+dogrula('zeybekten horona tekrar geçince ses sürüyor', r3.kemence > 0 && r3.davul > 0 && r3.ses === 'çalışıyor', JSON.stringify(r3));
+const olcum = await sayfa.evaluate(async () => {
+  const off = new OfflineAudioContext(1, 44100 * 2, 44100);
+  const [c0, a0] = [ses.ctx, ses.ana];
+  ses.ctx = off; ses.ana = off.destination;
+  try { for (let i = 0; i < 14; i++) kemence(i * 0.14, NOTA_K['efgfefedcba'[i % 11]], 0.13); }
+  finally { ses.ctx = c0; ses.ana = a0; }
+  const v = (await off.startRendering()).getChannelData(0);
+  let top = 0, tepe = 0; for (const x of v) { top += x * x; tepe = Math.max(tepe, Math.abs(x)); }
+  return { rms: +Math.sqrt(top / v.length).toFixed(4), tepe: +tepe.toFixed(3) };
+});
+dogrula('kemençe sesi gerçekten ses üretiyor ve kırpılmıyor', olcum.rms > 0.005 && olcum.tepe < 1, JSON.stringify(olcum));
+const dayaniklilik = await sayfa.evaluate(async () => {
+  durum.dans = 'horon'; say.davul = 0;
+  const k = kemence; kemence = () => { throw new Error('deneme hatası'); };
+  await new Promise((r) => setTimeout(r, 1500));
+  const sonuc = { davul: say.davul, ses: sesDurumu() };
+  kemence = k; ses.sonHata = null;
+  return sonuc;
+});
+dogrula('kemençede hata olsa da davul sürüyor, hata görünüyor', dayaniklilik.davul > 0 && dayaniklilik.ses.includes('deneme hatası'), JSON.stringify(dayaniklilik));
+await sayfa.evaluate(() => { durum.dans = 'horon'; });
+
 await sayfa.waitForTimeout(400);
 await sayfa.screenshot({ path: path.join(cikti, 'panelli.png') });
 await sayfa.locator('#sahne').screenshot({ path: path.join(cikti, 'tuval.png') });
