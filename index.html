@@ -2,11 +2,16 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Halay">
 <title>Online Halay</title>
 <style>
   html, body { margin: 0; height: 100%; background: #111; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; }
-  #sahne { position: absolute; left: 0; top: 0; background: #87c6ea; }
+  /* boyutla() çalışana kadar küçük dursun: 1080 px genişlik mobil tarayıcıyı uzaklaştırıp sayfayı küçültüyordu */
+  #sahne { position: absolute; left: 0; top: 0; width: 1px; height: 1px; background: #87c6ea; }
   body.temiz { background: transparent; }
   body.temiz #panel { display: none; }
   #panel { position: fixed; right: 0; top: 0; bottom: 0; width: 320px; overflow-y: auto; box-sizing: border-box;
@@ -72,9 +77,10 @@ const AZAMI_AVATAR = 60;         // ekranda en çok 60 avatar
 const TEMPO_SONME_MS = 45000;    // 45 sn beğeni gelmezse tempo bir kademe iner (en az "orta")
 
 const prm = new URLSearchParams(location.search);
-const TEMIZ = prm.get('temiz') === '1';
+const TEMIZ = prm.get('temiz') === '1' || prm.get('telefon') === '1'; // telefon sürümünde deneme paneli yok
 const SES_KAPALI = prm.get('ses') === '0';
-const YOUTUBE = prm.get('platform') === 'youtube';
+const TELEFON = prm.get('telefon') === '1';   // köprüsüz tarayıcı sürümü (telefon.mjs)
+const YOUTUBE = TELEFON || prm.get('platform') === 'youtube';
 const WS_ADRES = location.protocol === 'http:' && location.hostname === '127.0.0.1'
   ? 'ws://' + location.host
   : 'ws://127.0.0.1:' + (Number(prm.get('port')) || 8765);
@@ -686,7 +692,7 @@ function baglan() {
   ws.onclose = () => { wsDurum.textContent = 'köprü: bağlı değil, 2 sn sonra yeniden'; wsDurum.classList.remove('acik'); setTimeout(baglan, 2000); };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
 }
-baglan();
+if (!TELEFON) baglan(); // telefon sürümünde yerel köprü yok: olaylar telefon.mjs'den gelir
 sesBaslat(); // OBS gibi otomatik oynatmaya izin veren yerlerde ses hemen başlar; tarayıcıda ilk tıklamayı bekler
 
 // ====================== DENEME PANELİ ======================
@@ -715,6 +721,15 @@ document.getElementById('panel').addEventListener('click', (e) => {
   }
 });
 if (SES_KAPALI) $('pGunluk').textContent = '(?ses=0: ses kapalı)';
+</script>
+<script>
+  // telefon sürümü: modül yalnız ?telefon=1 ile ve http(s) üzerinden yüklenir (OBS file:// kullanımını etkilemez)
+  if (TELEFON) {
+    const s = document.createElement('script');
+    s.type = 'module'; s.src = 'telefon.mjs';
+    s.onerror = () => alert('telefon.mjs yüklenemedi. Sayfayı https adresinden açtığından emin ol.');
+    document.body.appendChild(s);
+  }
 </script>
 </body>
 </html>

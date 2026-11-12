@@ -85,3 +85,17 @@ test('yorumuCevir: kural, yapay zekâ, sınır', async () => {
   t = 3500; assert.deepEqual(await yorumuCevir('ali', 'kemençe çalsın', s, yz),
     { tur: 'yapay', ad: 'ali', metin: 'kemençe çalsın', hareket: 'horon', tempo: 'hizli', soz: 'Haydi!' });
 });
+
+test('beyin-cekirdek: dotenv/process olmadan çalışır, modeli parametreden alır', async () => {
+  const { spawnSync } = await import('node:child_process');
+  // process.env'i boşaltıp yalnız çekirdeği yükle; process'e erişseydi bile anahtar oradan gelmemeli
+  const kod = `import('./beyin-cekirdek.mjs').then(async (m) => {
+    let url = '';
+    const r = await m.yorumla('Ege havası', 'a', { anahtar: 'k', model: 'gemini-x-flash', fetch: async (u) => { url = u; return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"hareket":"zeybek","tempo":"ayni","soz":"Efe"}' }] } }] }) }; } });
+    const y = await m.yorumla('Ege havası', 'a', {});
+    console.log(JSON.stringify([r.hareket, url.includes('gemini-x-flash'), y.kaynak]));
+  })`;
+  const c = spawnSync(process.execPath, ['--input-type=module', '-e', kod], { env: {}, encoding: 'utf8' });
+  assert.equal(c.stderr, '');
+  assert.deepEqual(JSON.parse(c.stdout), ['zeybek', true, 'anahtar-yok']);
+});

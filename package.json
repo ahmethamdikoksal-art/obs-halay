@@ -10,7 +10,8 @@
     "sahte": "node sahte-test.mjs",
     "olcum": "node sahte-test.mjs --olcum",
     "test": "node --test test/*.test.mjs",
-    "kontrol": "node test/sayfa-kontrol.mjs"
+    "kontrol": "node test/sayfa-kontrol.mjs",
+    "telefon-kontrol": "node test/telefon-kontrol.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

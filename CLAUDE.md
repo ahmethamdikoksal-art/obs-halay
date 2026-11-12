@@ -13,3 +13,10 @@ TikTok canlı yayını için yorumla oynanan "Online Halay" oyunu.
 ## İzinli komutlar
 - hareket: `halay`, `horon`, `zeybek`, `yok`
 - tempo: `yavas`, `orta`, `hizli`, `cosku`, `ayni`
+
+## İstisna: telefon sürümü (telefon.html / telefon.mjs)
+Kullanıcının kararıyla (yalnız iPhone'u var, YouTube'da yayın yapacak) köprüsüz bir tarayıcı sürümü vardır. Bu sürümde iki kural esner:
+- **Kural 4:** API anahtarları `.env` yerine kullanıcının kendi telefonunun tarayıcısında (`localStorage`) durur. Kullanıcı anahtarı sayfadaki forma kendisi yazar. Anahtarlar koda, depoya ya da sohbete hiç girmez; yalnız Google'a, adres yerine `x-goog-api-key` başlığında gider. "Anahtarları sil" düğmesi depoyu boşaltır.
+- **Kural 5:** sayfa 127.0.0.1 yerine GitHub Pages'ten (`https://ahmethamdikoksal-art.github.io/obs-halay/`) açılır. Bu statik bir sayfadır, sunucu açmaz; yerel köprüye bağlanmaz.
+- Önerilen önlem: Google Cloud'da her iki anahtara **HTTP yönlendiren kısıtı** (`https://ahmethamdikoksal-art.github.io/*`) ve **API kısıtı** konur.
+Bilgisayar sürümü (index.html + köprüler) için 7 kural aynen geçerlidir.

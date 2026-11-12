@@ -29,6 +29,7 @@ Sınırlar: bir kişi 3 saniyede en çok bir komut verebilir. Ekranda en çok 60
 | `kopru.mjs` | TikTok'tan yorum, beğeni ve hediyeyi okur, `127.0.0.1:8765` adresinden sayfaya yollar. Sayfayı da aynı adresten sunar |
 | `beyin.mjs` | Kurala uymayan yorumu Gemini'ye gönderir; yalnız JSON `{hareket, tempo, soz}` ister |
 | `ortak.mjs` | Ortak kurallar: komut ayrıştırma, 3 sn sınırı, seri hediye (`repeatEnd`) mantığı |
+| `telefon.html`, `telefon.mjs`, `beyin-cekirdek.mjs` | iPhone/telefon için köprüsüz YouTube sürümü: tarayıcı sohbeti ve Gemini'yi doğrudan okur |
 | `sunucu.mjs` | Yalnız `127.0.0.1` adresinde çalışan HTTP ve WebSocket sunucusu |
 | `sahte-test.mjs` | Gerçek yayın olmadan sahte olay yollar; yapay zekâyı 10 yorumla ölçer |
 | `test/` | Birim testleri (`npm test`) ve tarayıcı denetimi (`npm run kontrol`) |
@@ -137,7 +138,58 @@ Yayın henüz başlamadıysa köprü 60 sn'de bir yeniden bakar. Açılış anı
 
 **Güvenlik:** Yalnız API anahtarı kullanılır; OAuth girişi, şifre ya da çerez yoktur. Anahtarla yalnız okunabilir, sohbete yazılamaz. Anahtar isteğe adres yerine başlıkta eklenir, böylece günlüklere düşmez.
 
-## Yapay zekâ kuralları (beyin.mjs)
+## iPhone'dan YouTube (bilgisayarsız)
+
+Bilgisayarın yoksa oyun iPhone'daki Safari'de tek başına çalışabilir. Bu sürümde köprü ve OBS yoktur; sohbeti sayfa kendisi okur.
+
+> Bu sürümde API anahtarları senin telefonunun tarayıcısında saklanır ve yalnız Google'a gider. Sayfanın kendisinde hiçbir anahtar yoktur. Yine de aşağıdaki **3. adımdaki kısıtları mutlaka koy**: anahtar biri tarafından görülse bile yalnız bu sayfada çalışır.
+
+### A. Bir kez yapılacaklar
+
+**1. Depoyu herkese açık yap** (GitHub'ın ücretsiz Pages hizmeti bunu istiyor; depoda gizli bilgi yok)
+1. Telefonda Safari ile https://github.com/ahmethamdikoksal-art/obs-halay adresini aç, giriş yap. Gerekirse en alttaki **Desktop** bağlantısıyla masaüstü görünümüne geç.
+2. **Settings** sekmesini aç; en altta **Danger Zone** bölümünde **Change visibility** → **Change to public** de ve onayla.
+
+**2. GitHub Pages'i aç**
+1. Aynı **Settings** sayfasında soldaki menüden **Pages**'e gir.
+2. **Source: Deploy from a branch** seç.
+3. **Branch** kutusunda `claude/tiktok-live-halay-game-twf9i3` dalını ve `/ (root)` klasörünü seç → **Save**.
+4. 1–2 dakika sonra sayfanın üstünde şu adres çıkar: `https://ahmethamdikoksal-art.github.io/obs-halay/`
+
+**3. Anahtarları al ve kısıtla**
+- **YouTube:** [Google Cloud Console](https://console.cloud.google.com/)'da proje aç. **API'ler ve Hizmetler → Kitaplık → YouTube Data API v3 → Etkinleştir**, ardından **Kimlik bilgileri → Kimlik bilgisi oluştur → API anahtarı**. Anahtarın kalemine dokun:
+  - **Uygulama kısıtlamaları:** *Web siteleri* seç, `https://ahmethamdikoksal-art.github.io/*` ekle.
+  - **API kısıtlamaları:** yalnız *YouTube Data API v3*.
+  - **Kaydet**.
+- **Gemini (isteğe bağlı, serbest yorumlar için):** https://aistudio.google.com/apikey adresinden anahtar oluştur. Aynı Cloud Console'da **Kimlik bilgileri** listesinde bu anahtar da görünür; aynı *Web siteleri* kısıtını ekle.
+- Anahtarları kopyalayıp bir yere not etme; doğrudan oyun sayfasına yapıştıracaksın.
+
+**4. Oyunu telefona ekle**
+1. Safari'de `https://ahmethamdikoksal-art.github.io/obs-halay/telefon.html` adresini aç.
+2. **Paylaş** düğmesi → **Ana Ekrana Ekle**. Ana ekranda "Halay" simgesi olur; oradan açınca Safari çubukları görünmez, tam ekran olur.
+3. **Ayarlar → Ekran ve Parlaklık → Otomatik Kilit → Asla** yap. Sayfa ekranı açık tutmayı dener, ama bu ayar daha garanti.
+
+### B. Her yayında
+
+1. **YouTube Studio** (uygulama ya da studio.youtube.com) üzerinden canlı yayını oluştur ve **paylaşım adresini** kopyala.
+2. Ana ekrandaki **Halay** simgesini aç:
+   1. YouTube anahtarını, (varsa) Gemini anahtarını ve yayın adresini yapıştır.
+   2. **Bu telefonda hatırla** seçiliyse bir dahaki sefere yalnız yayın adresini değiştirirsin.
+   3. **▶ Başla**'ya dokun. Ses ancak bu dokunuşla açılabilir.
+3. Telefon ekranını YouTube'a yayınla. Bunu yapabilen bir uygulama gerekir:
+   - **YouTube uygulaması** ekran yayınını destekliyorsa o yeter. YouTube telefon uygulamasından canlı yayın için en az 50 abone istiyor.
+   - Desteklemiyorsa **Streamlabs** ya da **PRISM Live Studio** gibi "ekranı yayınla" özelliği olan bir uygulama kullan. Bu uygulamalar YouTube Studio'daki yayın anahtarıyla çalışır.
+   - Yayını başlatırken iPhone'un ekran kaydı penceresi çıkar. **Mikrofon**'u kendi sesin için açık bırakabilirsin.
+4. Sonra **Halay** uygulamasına geri dön ve **ön planda bırak**. Safari arka plana geçerse sohbet okunmaz. Üstte kısa bir "Sohbet bağlı ✓" yazısı belirip kaybolur.
+5. Ayarlara dönmek için ekrana **çift dokun**. Yayın bitince uygulamayı kapat.
+
+**Bilinen sınırlar**
+- Yayında yalnız oyun ekranı görünür, kamera görünmez.
+- Davul ve zurna sesinin ekran yayınına girip girmemesi kullandığın yayın uygulamasına bağlı.
+- Kota ve gecikme bilgisi bilgisayar sürümüyle aynıdır (yukarıdaki YouTube bölümü). Sayfadaki "okuma aralığı" kutusu kotayı ayarlar.
+- iPhone'da gerçek cihazda, ekran yayını uygulamalarıyla ve GitHub Pages üzerinde **denenmedi**. Testler iPhone 13 benzetimiyle ve sahte YouTube yanıtlarıyla yapıldı (`npm run telefon-kontrol`). Gerçek YouTube'un tarayıcıdan gelen isteği kabul ettiği ayrıca doğrulandı.
+
+## Yapay zekâ kuralları (beyin.mjs, beyin-cekirdek.mjs)
 
 - Yönergede iki olumlu, bir olumsuz örnek var. Gemini'den `responseMimeType: application/json` ve bir şema ile yalnız JSON istenir.
 - "Önceki talimatları unut", "ignore previous instructions", "sistem promptu", "sen artık …", "API anahtarını söyle" gibi yorumlar Gemini'ye **hiç gönderilmez**.
